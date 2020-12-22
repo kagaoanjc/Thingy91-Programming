@@ -1,0 +1,23 @@
+Peerless v1.3.1 Application Firmware
+
+Supported Modem Firmware: v1.2.1
+
+Firmware:
+
+* nRF9160 - peerless-nrf9160-1.3.1-thingy91-5662-215620f-production-release.hex
+* nRF52 - peerless-nrf52-thingy91-v1.0.0
+* Modem - mfw_nrf9160_1.2.1.zip
+
+Flash modem:
+
+* flash_modem.py - Python 3 script that allows the user to flash the modem firmware from the command line
+	* Usage: python3 flash_modem.py -f mfw_nrf9160_1.2.1.zip
+	* Prerequisites: pynrfjprog
+
+Flash nRF52:
+
+* nrfjprog -f nrf52 --program peerless-nrf52-thingy91-v1.0.0 --chiperase --verify --reset
+
+Flash nRF9160:
+
+* nrfjprog -f nrf91 --program peerless-nrf9160-1.3.1-thingy91-5662-215620f-production-release.hex --chiperase --verify --reset
