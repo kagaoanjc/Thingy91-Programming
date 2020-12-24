@@ -4,17 +4,47 @@
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
 
 
-import config
+import cfg
 import os
 import time
-
 import csv
 import sys
-import traceback
+import re
 from datetime import datetime
 from os import name
+import mysql.connector
+import stdiomask
+import logging
+from func import writeToDB, checkOperator, checkSerialNumber
+from pynrfjprog import HighLevel
 
+modem_zip = cfg.fw['mdm9160']
+nrf52811 = cfg.fw['fw52811']
+nrf9160 = cfg.fw['fw9160']
+prgMode = cfg.settings['mode']
+now = datetime.now()
+ROOT_DIR = os.path.abspath(os.curdir)
+hourNow = int(now.strftime("%H"))
+
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger('Thingy91')
+
+operatorsDB = mysql.connector.connect(
+    host="127.0.0.1",
+    port=3306,
+    user="testing",
+    password="testing"
+)
+
+thingy91PrgDB = mysql.connector.connect(
+    host="127.0.0.1",
+    port=3306,
+    user="testing",
+    password="testing"
+)
 # define our clear function
+
+
 def clear():
     # for windows
     if name == 'nt':
@@ -24,19 +54,6 @@ def clear():
         os.system('clear')
     # print out some text
 
-try:
-    from..import HighLevel
-except Exception:
-    from pynrfjprog import HighLevel
-
-# logging.basicConfig(level=logging.INFO)
-# log = logging.getLogger('modem_update')
-modem_zip = config.fw['mdm9160']
-nrf52811 = config.fw['fw52811']
-nrf9160 = config.fw['fw9160']
-testpath = "E:\Project\Python\Thingy91_Programming\peerless-nrf9160-1.3.1-thingy91-5662-215620f-production-release.hex"
-now = datetime.now()
-ROOT_DIR = os.path.abspath(os.curdir)
 
 def find_verify_hex(fwPath):
     #Find the appropriate hex file to program
@@ -44,7 +61,8 @@ def find_verify_hex(fwPath):
         return fwPath
         print("File %s exists", fwPath)
 
-def flash_IC(model,verify):
+
+def flash_IC(model):
     with HighLevel.API() as api:
         snr = api.get_connected_probes()
         jSNR = int(snr[0])
@@ -101,14 +119,16 @@ def flash_modem_pkg(model,verify):
         api.close()
         # log.info(f"Completed in {time.time() - start} seconds")
 
+
 def getSN():
     peerlessSN = input('Enter unit Serial Number: ')
     peerlessSN = peerlessSN.strip()
-    # snCheck = re.match('^[K][0-9]{11}', peerlessSN)
-    if len(peerlessSN)>0:
+    snCheck = re.match('^[K][0-9]{11}', peerlessSN)
+    if snCheck:
         return peerlessSN
     else:
         return ""
+
 
 def prepareCSV():
     fileName = "Thingy91_PRG_"+now.strftime("%m_%d_%Y")+".csv"
@@ -118,9 +138,10 @@ def prepareCSV():
     else:
         with open(logPath, 'w', newline='') as file:
             writer = csv.writer(file)
-            writer.writerow(["SN", "Result", "TimeStamp","Remark","TactTime"])
+            writer.writerow(["SN", "Result", "TimeStamp","Remark","TactTime","Operator","SO/PO Number","Lot Number"])
 
-def writeLog(SN,testStatus,remark,tactime):
+
+def writeLog(SN,testStatus,remark,tactime,operator,so_poNum,lotNum):
     fileName = "Thingy91_PRG_" + now.strftime("%m_%d_%Y") + ".csv"
     logPath = ROOT_DIR + "\Logs\%s" % fileName
     logTimeStamp = now.strftime("%m/%d/%Y_%H:%M:%S")
@@ -131,12 +152,13 @@ def writeLog(SN,testStatus,remark,tactime):
     if os.path.exists(logPath):
         with open(logPath, 'a',newline='') as file:
             writer = csv.writer(file)
-            writer.writerow([SN, result, logTimeStamp,remark,tactime])
+            writer.writerow([SN, result, logTimeStamp,remark,tactime,operator,so_poNum,lotNum])
     else:
         prepareCSV()
         with open(logPath, 'a',newline='') as file:
             writer = csv.writer(file)
-            writer.writerow([SN,result,logTimeStamp,remark,tactime])
+            writer.writerow([SN,result,logTimeStamp,remark,tactime,operator,so_poNum,lotNum])
+
 
 def cleanCSV():
     fileName = "Thingy91_PRG_" + now.strftime("%m_%d_%Y") + ".csv"
@@ -147,14 +169,59 @@ def cleanCSV():
             for row in csv.reader(in_file):
                 if row:
                     writer.writerow(row)
-def main():
+
+
+def prgAction(testCx,so_poNum,lotNum,operator,SN):
     testStatus = bool(True)
     remark = "None"
-    while True:
-        print("Thingy91 Programming Python Script v2.0.0.0")
+    start = time.time()
+    # print("Before proceeding please flip SW2 (SWD Select) to nrf91")
+    # input("Press Enter key to continue")
+    # if testStatus == True:
+    #     try:
+    #         flash_modem_pkg(modem_zip,True)
+    #     except:
+    #         print("Oops!", traceback.format_exc(limit=0), "occured!")
+    #         print("Unit %s has failed" % SN)
+    #         testStatus = testStatus and False
+    #         remark = "flash_modem_pkg "+ str(traceback.format_exc(limit=0))
+    #         # break
+    # if testStatus == True:
+    #     try:
+    #         flash_IC(nrf9160,True)
+    #     except:
+    #         print("Oops!", traceback.format_exc(limit=0), "occured!")
+    #         print("Unit %s has failed" % SN)
+    #         testStatus = testStatus and False
+    #         remark = "flash_IC_nrf9160 "+ str(traceback.format_exc(limit=0))
+    #         # break
+    #     print("Before proceeding please flip SW2 (SWD Select) to nrf52")
+    #     input("Press Enter key to continue")
+    # if testStatus == True:
+    #     try:
+    #         flash_IC(nrf52811,True)
+    #     except:
+    #         print("Oops!", traceback.format_exc(), "occured!")
+    #         print("Unit %s has failed" % SN)
+    #         testStatus = testStatus and False
+    #         remark = "flash_IC_nrf52811 "+ str(traceback.format_exc(limit=0))
+    #         # break
+    tactTime = str(time.time() - start)
+    print("Activity finished in %s seconds!" % tactTime)
+    if testStatus:
+        writeLog(SN, testStatus, remark.strip(),tactTime,operator,so_poNum,lotNum)
+        writeToDB(testCx,SN,testStatus,remark.strip(),operator,so_poNum)
+    input("Press Enter key to restart script")
+    os.system('cls')
+    print("Thingy91 Programming Python Script v2.0.0.0")
+    print("Written by Juan Carlos Kagaoan 22/12/2020")
+
+
+def prgLoop(testCx,so_poNum,lotNum,operator):
+        os.system('cls')
+        print("Thingy91 Programming Python Script v2.0.0.1")
         print("Written by Juan Carlos Kagaoan 22/12/2020")
         prepareCSV()
-        start = time.time()
         SN = str(getSN())
         lenSN = len(SN)
         while lenSN==0:
@@ -163,46 +230,59 @@ def main():
             lenSN = len(SN)
             if lenSN > 0:
                 break
-        print("Before proceeding please flip SW2 (SWD Select) to nrf91")
-        input("Press Enter key to continue")
-        if testStatus == True:
-            try:
-                flash_modem_pkg(modem_zip,True)
-            except:
-                print("Oops!", traceback.format_exc(limit=0), "occured!")
-                print("Unit %s has failed" % SN)
-                testStatus = testStatus and False
-                remark = "flash_modem_pkg "+ str(traceback.format_exc(limit=0))
-                # break
-        if testStatus == True:
-            try:
-                flash_IC(nrf9160,True)
-            except:
-                print("Oops!", traceback.format_exc(limit=0), "occured!")
-                print("Unit %s has failed" % SN)
-                testStatus = testStatus and False
-                remark = "flash_IC_nrf9160 "+ str(traceback.format_exc(limit=0))
-                # break
-            print("Before proceeding please flip SW2 (SWD Select) to nrf52")
-            input("Press Enter key to continue")
-        if testStatus == True:
-            try:
-                flash_IC(nrf52811,True)
-            except:
-                print("Oops!", traceback.format_exc(), "occured!")
-                print("Unit %s has failed" % SN)
-                testStatus = testStatus and False
-                remark = "flash_IC_nrf52811 "+ str(traceback.format_exc(limit=0))
-                # break
-        tactTime = str(time.time() - start)
-        print("Activity finished in %s seconds!" % tactTime)
-        if testStatus:
-            print("Unit %s has passed!" % SN)
-        writeLog(SN, testStatus, remark.strip(),tactTime)
-        input("Press Enter key to restart script")
-        testStatus = bool(True)
-        remark = "None"
+        testVal = checkSerialNumber(testCx,SN)
+        if testVal == 1:
+            pw = stdiomask.getpass(prompt='Sorry, the unit has been tested three times already, kindly enter FA password to continue: ',mask='*')
+            if pw.strip() == 'kt_prod_engr':
+                print("password correct")
+                input("Press Enter to Continue")
+                prgAction(so_poNum, lotNum, operator,SN)
+            else:
+                print("Sorry, password is incorrect, restarting the software")
+                input("Press Enter to Continue")
+        elif testVal == 2:
+            print("Unit has been programmed already!")
+            input("Press Enter to Continue")
+
+        elif testVal ==0:
+            prgAction(testCx,so_poNum, lotNum, operator,SN)
+
+
+def prgStart(opCx,testCx):
+    employeeNumber = input("Please input your employee number: ")
+    checkOp = checkOperator(opCx,employeeNumber)
+    if checkOp:
+        so_poNum = input("Please input SO/PO Number: ")
+        lotNum = input("Please input lot Number: ")
+        print("Storing info, program starting...")
+        time.sleep(1)
+        while True:
+            prgLoop(testCx, so_poNum, lotNum, employeeNumber)
+    elif checkOp is False:
+        print("Sorry you are not allowed to operate this station/script")
+        input("Please press enter to restart or press the close button to close this script")
+    elif checkOp is None:
+        print("Operator doesn't exist! Try again")
+        input("Please press enter to restart or press the close button to close this script")
+
+
+def main():
+    while True:
         os.system('cls')
+        print("Thingy91 Programming Python Script v2.0.0.1")
+        print("Written by Juan Carlos Kagaoan 22/12/2020")
+        prgStart(operatorsDB,thingy91PrgDB)
+
+    # testStatus = bool(True)
+    # remark = "None"
+    # print("Thingy91 Programming Python Script v2.0.0.0")
+    # print("Written by Juan Carlos Kagaoan 22/12/2020")
+    # employeeNumber = input("Please input your employee number: ")
+    # if checkOperator(employeeNumber):
+    #     so_poNum = input("Please input SO/PO Number: ")
+    #     lotNum = input("Please input lot Number: ")
+    #     prgLoop(testStatus,remark,so_poNum,lotNum,employeeNumber)
+
 
     # print(testStatus)
     # writeLog(SN,testStatus,remark.strip()testTime)
