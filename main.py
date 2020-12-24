@@ -273,36 +273,6 @@ def main():
         print("Written by Juan Carlos Kagaoan 22/12/2020")
         prgStart(operatorsDB,thingy91PrgDB)
 
-    # testStatus = bool(True)
-    # remark = "None"
-    # print("Thingy91 Programming Python Script v2.0.0.0")
-    # print("Written by Juan Carlos Kagaoan 22/12/2020")
-    # employeeNumber = input("Please input your employee number: ")
-    # if checkOperator(employeeNumber):
-    #     so_poNum = input("Please input SO/PO Number: ")
-    #     lotNum = input("Please input lot Number: ")
-    #     prgLoop(testStatus,remark,so_poNum,lotNum,employeeNumber)
-
-
-    # print(testStatus)
-    # writeLog(SN,testStatus,remark.strip()testTime)
-    # # cleanCSV()
-    # input("Press Enter key to restart script")
-
-
-    # flash_IC(nrf9160, True)
-    # print("Before proceeding please flip SW2 (SWD Select) to nrf52")
-    # input("Press Enter key to continue")
-    # flash_IC(nrf52811, True)
-    # print(f"Completed in {time.time() - start} seconds")
-    # #parser = argparse.ArgumentParser()
-    # #parser.add_argument("modem_pkg")
-    # #parser.add_argument("snr")
-    # #args = parser.parse_args()
-    # #log.info("Modem firmware upgrade")
-    # #flash_modem_pkg(args.modem_pkg, args.snr, True)
-
-
 if __name__ == '__main__':
     main()
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
